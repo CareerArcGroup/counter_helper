@@ -54,12 +54,20 @@ module CounterHelper
       counter_list_lock.lock do
         each_counter do |key, last_read_slice|
           each_counter_value(key, last_read_slice.to_i + 1, end_slice, mark_read, &block)
-        end
+        end.flatten.compact
       end
     end
 
     def read_counters!(&block)
       read_counters(true, &block)
+    end
+
+    def read_counter(key, mark_read=false, &block)
+      each_counter_value(key, nil, slice_index - 1, mark_read, &block)
+    end
+
+    def read_counter!(key, &block)
+      read_counter(key, true, &block)
     end
 
     def configure(options={})
@@ -69,11 +77,11 @@ module CounterHelper
     protected
 
     def counter_list
-      @counter_list ||= Redis::SortedSet.new(COUNTER_LIST_KEY)
+      @counter_list ||= Redis::SortedSet.new(COUNTER_LIST_KEY, redis)
     end
 
     def counter_list_lock
-      @counter_list_lock ||= Redis::Lock.new(COUNTER_LIST_LOCK_KEY, timeout: 0, expiration: 60)
+      @counter_list_lock ||= Redis::Lock.new(COUNTER_LIST_LOCK_KEY, redis, timeout: 0, expiration: 60)
     end
 
     # =================================================================
@@ -116,7 +124,7 @@ module CounterHelper
     # counter slice. if it doesn't exist, it will be created
     # with a value of 0 and given an expiration...
     def slice_counter(key, slice=slice_index)
-      slice = Redis::Counter.new(slice_name(key, slice))
+      slice = Redis::Counter.new(slice_name(key, slice), redis)
 
       unless slice.exists?
         slice.reset
@@ -132,7 +140,7 @@ module CounterHelper
 
     # enumerate over counters with their last-viewed times...
     def each_counter(&block)
-      counter_list.members(with_scores: true).each(&block); nil
+      counter_list.members(with_scores: true).map(&block)
     end
 
     # enumerates over counter values for the specific key
@@ -155,12 +163,19 @@ module CounterHelper
       # if we're marking last-read times, set the score to start_slice - 1...
       counter_list[key] = start_slice - 1 if mark_read
 
-      (start_slice..end_slice).each do |slice|
+      (start_slice..end_slice).map do |slice|
         counter = slice_counter(key, slice)
         value = counter.value
         timestamp = Time.at(slice * granularity)
 
-        yield ({ counter: key, value: value, timestamp: timestamp }) if block_given?
+        item = {
+          counter: key,
+          value: value,
+          timestamp: timestamp
+        }
+
+        result = yield(item) if block_given?
+        result ||= item
 
         # increment the last-read value as we enumerate. if we ever
         # get out of sync (which we shouldn't), just set the score.
@@ -170,7 +185,8 @@ module CounterHelper
           counter_list[key] = slice unless last == slice
         end
 
-      end; nil
+        result
+      end
     end
 
     # =================================================================
@@ -203,6 +219,10 @@ module CounterHelper
     # =================================================================
     # config
     # =================================================================
+
+    def redis
+      Config.redis
+    end
 
     def counter_list_key
       @counter_list_key ||= key_with_prefix(COUNTER_LIST_KEY)
