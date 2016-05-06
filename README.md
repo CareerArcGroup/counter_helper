@@ -13,6 +13,28 @@ With CounterHelper, you'll never again have to worry about:
 
 You can finally relax, knowing that CounterHelper has your back!
 
+## Summary
+
+CounterHelper is a library designed to help you count things over time.
+
+Let's say that you're worried that you're in some kind of Truman Show- or Matrix-like simulation due to the odd pattern of events you've been witnessing lately. You want to keep a table of event counts like:
+
+| Event               | 8AM  | 9AM  | 10AM | 11AM | 12PM | 1PM  | 2PM  | 3PM  | 4PM  | 5PM  |
+| :------------------ | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| Red car spotted     | 1    | 0    | 1    | 0    | 1    | 0    | 1    | 0    | 1    | 0    |
+| Dog catches frisbee | 5    | 0    | 0    | 5    | 0    | 0    | 5    | 0    | 0    | 5    |
+| Runner ties shoes   | 1    | 3    | 0    | 1    | 3    | 0    | 1    | 3    | 0    | 1    |
+| Computer crashes    | 9    | 9    | 9    | 9    | 0    | 9    | 9    | 9    | 9    | 0    |
+
+Looks normal to me, Mr. Anderson. But you don't need to keep track of this stuff in your notebook! Instead, you can use CounterHelper to keep track of it all for you!
+
+With CounterHelper, you set:
+
+* the `granularity` - How big are the time-slices? In our example, time is divided into 1 hour blocks.
+* the `expiration` - How long do we want to keep the data? Here we're keeping 10 hours worth.
+
+Then you can count and count, and at any point, CounterHelper can give you the data for the last 10 hours just like in the table above. Sound good? Read on, friend!
+
 ## Installation
 
 Add this line to your application's Gemfile:
@@ -28,6 +50,47 @@ And then execute:
 Or install it yourself as:
 
     $ gem install counter_helper
+
+## Configuration
+
+Here's how you configure CounterHelper, along with a table of configuration options for reference. If you're using Rails, you can put this configuration in an initializer (i.e. config/initializers/counter_helper.rb).
+
+```ruby
+CounterHelper.configure(
+  granularity: 60,      # 1 minute
+  expiration:  5 * 60,  # 5 minutes
+)
+```
+
+Here's a full listing of all of the things you can configure:
+
+| Item            | Default              | Description                                              |
+| --------------- | -------------------- | -------------------------------------------------------- |
+| `granularity`   | 60 (1 minute)        | Time-slice duration in seconds.                          |
+| `expiration`    | 7200 (2 hours)       | Time in seconds to keep counter data                     |
+| `redis`         | `Redis.current`      | Redis connection to use. See below for example           |
+| `redis_prefix`  | `nil`                | A string prefix to use with all CounterHelper Redis keys |
+| `logger`        | `Logger.new(STDOUT)` | The logger CounterHelper should use for logging          |
+| `log_formatter` | `nil`                | See [Logging](#logging)                                  |
+
+By default, CounterHelper will try to use `Redis.current` as a Redis client. If you're already using Redis and have configured it elsewhere, this default may be fine for you. If not, or if you want to put CounterHelper data into its own special place, here are a couple options for how you can configure it:
+
+```ruby
+# Option 1: By passing a configuration Hash.
+# This hash will be passed directly to Redis.new (see the redis-rb gem for details)
+CounterHelper.configure(
+  redis: {
+    host: "10.0.0.123",
+    port: 6380,
+    db:   10
+  }
+)
+
+# Option 2: By passing a Redis object
+ConfigHelper.configure(
+  redis: Redis.new(host: "10.0.0.123", port: 6380, db: 10)
+)
+```
 
 ## Usage
 
@@ -72,6 +135,16 @@ The second call to `value` returns 0 because although there was 1 tasty Pop-Tart
 Now that you've done all the hard work, it's time to see some results! CounterHelper lets you see all of the awesome time sliced goodness through the use of a method called (drumroll) `read_counters`:
 
 ```ruby
+# call it as a pure method...
+CounterHelper.read_counters
+
+# => [
+#  {:counter=>"Pop-Tarts eaten", :value=>0, :timestamp=>2016-02-14 22:00:00 -0700},
+#  {:counter=>"Pop-Tarts eaten", :value=>1, :timestamp=>2016-02-14 22:01:00 -0700},
+#  {:counter=>"Pop-Tarts eaten", :value=>0, :timestamp=>2016-02-14 22:02:00 -0700}
+# ]
+
+# or call it as an iterator...
 CounterHelper.read_counters do |item|
   puts "Count '#{item[:counter]}' had value #{item[:value]} on #{item[:timestamp].to_s(:long)}"
 end
@@ -88,21 +161,57 @@ CounterHelper will only keep track of counts for a configurable time period afte
 
 And for those of us that don't need to be reminded of data we've already seen, there's the lovely `read_counters!` method which marks the data as it's yielded so that you only see it once (i.e. you won't see it in future `read_counters` or `read_counters!` calls).
 
-### Configuration
-
-There are a couple of configuration items that CounterHelper exposes. Here they are:
-
-| Item          | Default        | Description                          |
-| ------------- | -------------- | ------------------------------------ |
-| `granularity` | 60 (1 minute)  | Time-slice duration in seconds.      |
-| `expiration`  | 7200 (2 hours) | Time in seconds to keep counter data |
-
-You can configure CounterHelper (generally in an initializer) like so:
+You can also read just one counter at a time if you'd like:
 
 ```ruby
+CounterHelper.read_counter("My Counter")
+```
+
+Of course, you can use the iterator calling style for this method too. And there's a `read_counter!` method as well if you only want to see the data once.
+
+## Logging
+
+Often times when you `increment` or `decrement` a counter, you'll want to log some relevant information at the same time. To that end, we present the *with_logging* method flavors:
+
+```ruby
+# decrement the "My Counter" counter, and log "My Log Message" to the logger...
+CounterHelper.decrement_with_logging("My Counter", "My Log Message")
+
+# increment the "Exceptions caught" counter and log `ex.message` on Exception `ex`...
+CounterHelper.increment_with_logging("Exceptions caught", ex)
+```
+
+You may want to get a little more fancy with your logging. As noted in the [Configuration](#configuration) section, you can have CounterHelper use a custom logger. You can also provide a `log_formatter` Proc to shape the data that is logged. Here's an example that uses a Log4r logger:
+
+```ruby
+# configuration
 CounterHelper.configure(
-  granularity: 60, # 1 minute
-  expiration: 5 * 60 # 5 minutes
+  logger: Log4r::Logger["CounterHelper"]
+  log_formatter: ->(counter, value, message_or_exception, options) do
+    exception = message_or_exception if message_or_exception.is_a?(Exception)
+    exception ||= options.delete(:exception)
+
+    message = exception.message if exception
+
+    options.merge!(short_message: message, counter_key: key, counter_value: value)
+    options.merge!(exception: exception.message, backtrace: exception.backtrace.join("\n")) if exception
+
+    options
+  end
+)
+
+# and now we count something...
+CounterHelper.increment_with_logging("Unhandled exceptions", ex, controller: "Home", action: "Index")
+
+# this would return the new value of the counter (let's say it's 5)
+# and CounterHelper would make a logging call equivalent to:
+logger = Log4r::Logger["CounterHelper"]
+logger.error(
+  short_message: "Undefined method `length` for nil",
+  counter_key: "Unhandled exceptions",
+  counter_value: 5,
+  exception: "Undefined method `length` for nil",
+  backtrace: "... backtrace ..."
 )
 ```
 

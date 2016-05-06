@@ -32,13 +32,15 @@ module CounterHelper
     end
 
     def increment_with_logging(key, message, options = {}, &block)
-      increment(key, &block)
-      log(key, message, options)
+      value = increment(key, &block)
+      log(key, value, message, options)
+      value
     end
 
     def decrement_with_logging(key, message, options = {}, &block)
-      decrement(key, &block)
-      log(key, message, options)
+      value = decrement(key, &block)
+      log(key, value, message, options)
+      value
     end
 
     def value(key)
@@ -201,19 +203,19 @@ module CounterHelper
       Config.log_formatter
     end
 
-    def log(key, message_or_exception, options = {})
+    def log(key, value, message_or_exception, options = {})
       is_exception = message_or_exception.is_a?(Exception)
-      level = options[:level] || (is_exception ? :error : :info)
+      level = options.delete(:level) || (is_exception ? :error : :info)
 
-      value = if log_formatter
-        log_formatter.call(key, message_or_exception, options)
+      payload = if log_formatter
+        log_formatter.call(key, value, message_or_exception, options)
       elsif is_exception
         message_or_exception.message
       else
         message_or_exception
       end
 
-      logger.send(level, value)
+      logger.send(level, payload)
     end
 
     # =================================================================
