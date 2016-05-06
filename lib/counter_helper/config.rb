@@ -13,12 +13,19 @@ module CounterHelper
         end
       end
 
+      def redis
+        @redis || Redis.current
+      end
+
+      def redis=(value)
+        @redis = value.is_a?(Hash) ? Redis.new(value) : value
+      end
+
       def granularity
         @granularity || DEFAULT_GRANULARITY
       end
 
       def granularity=(value)
-        #raise ArgumentError, "granularity must be at least one minute" unless value >= 60
         raise ArgumentError, "granularity cannot be larger than expiration" if value > expiration
 
         @granularity = value
@@ -29,7 +36,6 @@ module CounterHelper
       end
 
       def expiration=(value)
-        raise ArgumentError, "expiration must be at least one minute" unless value >= 60
         raise ArgumentError, "expiration cannot be less than or equal to granularity" if value <= granularity
 
         @expiration = value
