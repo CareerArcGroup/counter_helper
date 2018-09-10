@@ -246,7 +246,7 @@ module CounterHelper
         message_or_exception
       end
 
-      logger.send(level, payload)
+      logger.send(level, *payload)
     end
 
     # =================================================================
