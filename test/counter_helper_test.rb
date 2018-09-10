@@ -1,11 +1,11 @@
 require "test_helper"
 
 class CounterHelperTest < Minitest::Test
-
   def setup
     CounterHelper.configure(
-      granularity: 60, # 1 minute
-      expiration: 5 * 60 # 5 minutes
+      granularity: 60,     # 1 minute
+      expiration: 5 * 60,  # 5 minutes
+      logger: logger
     )
 
     # make sure all counters are marked as read...
@@ -45,6 +45,30 @@ class CounterHelperTest < Minitest::Test
     CounterHelper.send(:unregister, banana_key)
   end
 
+  def test_increment_with_logging
+    coconut_key = TestHelper.create_key("coconut")
+
+    assert_equal 0, CounterHelper.value(coconut_key)
+
+    assert_equal 1, CounterHelper.increment_with_logging(coconut_key, "I just ate a coconut!")
+    assert_logged(:info, "I just ate a coconut!")
+
+    assert_equal 2, CounterHelper.increment_with_logging(coconut_key, Exception.new("A coconut hit me on the head!"))
+    assert_logged(:error, "A coconut hit me on the head!")
+  end
+
+  def test_increment_with_logging
+    durian_key = TestHelper.create_key("durian")
+
+    assert_equal 0, CounterHelper.value(durian_key)
+
+    assert_equal -1, CounterHelper.decrement_with_logging(durian_key, "What is that smell?")
+    assert_logged(:info, "What is that smell?")
+
+    assert_equal -2, CounterHelper.decrement_with_logging(durian_key, Exception.new("Someone is eating a durian!"))
+    assert_logged(:error, "Someone is eating a durian!")
+  end
+
   def test_read_counters
     monkey_key = TestHelper.create_key("monkey")
 
@@ -75,5 +99,15 @@ class CounterHelperTest < Minitest::Test
         expected += 1
       end
     end
+  end
+
+  private
+
+  def logger
+    @logger ||= TestHelper::TestLogger.new
+  end
+
+  def assert_logged(level, payload)
+    assert_equal [level, payload], logger.last_args
   end
 end

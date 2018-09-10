@@ -36,31 +36,6 @@ module CounterHelper
       block_given? ? rewindable_block(:increment, key, by, value, &block) : value
     end
 
-    def push(key, value)
-      key = normalize_key(key)
-      register(key, true) unless registered?(key)
-      ss = Redis::SortedSet.new(key, redis)
-      ss.add(value, Time.now.to_i)
-    end
-
-    def average_data(key)
-      key = normalize_key(key)
-      window = 100
-      ss = Redis::SortedSet.new(key, redis)
-
-      nums = ss.rev_range(0, window)
-      if ss.length > window
-        limit = ss.score(ss.at(window * -1))
-        ss.delete_if!{|x| ss.score(x) < limit}
-      end
-      nums
-    end
-
-    def average(key)
-      nums = average_data(key)
-      nums.empty? ? 0.0 : nums.map(&:to_f).reduce(0, :+) / nums.count
-    end
-
     def increment_with_logging(key, message, options = {}, &block)
       value = increment(key, &block)
       log(key, value, message, options)
@@ -104,32 +79,23 @@ module CounterHelper
       read_counter(key, true, &block)
     end
 
-    def read_averages!(&block)
-      average_list_lock.lock do
-        each_average do |key|
-          yield ({ average: key.first, value: average(key.first) })
-        end
-      end
-    end
-
     def prune_counters
-      keep_count = 0
+      keep_count  = 0
       prune_count = 0
-      end_slice = slice_index - 1
+      end_slice   = slice_index - 1
+
       each_counter do |key, last_read_slice|
         has_data = false
         each_counter_value(key, 0, end_slice, false) do |data|
-          if data[:value] > 0
-            has_data = true
-            break
-          end
+          (has_data = true; break) if data[:value] > 0
         end
 
         if has_data
           keep_count += 1
         else
-          prune_count += 1
           puts "Counter '#{key}' does NOT have data; unregistering"
+
+          prune_count += 1
           unregister(key)
         end
       end
@@ -147,16 +113,8 @@ module CounterHelper
       @counter_list ||= Redis::SortedSet.new(COUNTER_LIST_KEY, redis)
     end
 
-    def average_list
-      @average_list ||= Redis::SortedSet.new(AVERAGE_LIST_KEY, redis)
-    end
-
     def counter_list_lock
       @counter_list_lock ||= Redis::Lock.new(COUNTER_LIST_LOCK_KEY, redis, timeout: 0, expiration: 60)
-    end
-
-    def average_list_lock
-      @average_list_lock ||= Redis::Lock.new(AVERAGE_LIST_LOCK_KEY, redis, timeout: 0, expiration: 60)
     end
 
     # =================================================================
@@ -165,18 +123,18 @@ module CounterHelper
 
     # adds the counter key to the counter list
     # with a score of 0...
-    def register(key, average = false)
-      average ? average_list.add(key, slice_index - 1) : counter_list.add(key, slice_index - 1)
+    def register(key)
+      counter_list.add(key, slice_index - 1)
     end
 
     # removes the counter key from the counter list
-    def unregister(key, average = false)
-      average ? average_list.delete!(key) : counter_list.delete!(key)
+    def unregister(key)
+      counter_list.delete!(key)
     end
 
     # checks to see if the counter is registered
-    def registered?(key, average = false)
-      average ? average_list.score(key) != nil : counter_list.score(key) != nil
+    def registered?(key)
+      counter_list.score(key) != nil
     end
 
     # =================================================================
@@ -216,10 +174,6 @@ module CounterHelper
     # enumerate over counters with their last-viewed times...
     def each_counter(&block)
       counter_list.members(with_scores: true).map(&block)
-    end
-
-    def each_average(&block)
-      average_list.members(with_scores: true).each(&block); nil
     end
 
     # enumerates over counter values for the specific key

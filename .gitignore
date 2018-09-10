@@ -8,3 +8,4 @@ redis.yml
 /pkg/
 /spec/reports/
 /tmp/
+*.gem
