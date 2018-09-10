@@ -30,6 +30,19 @@ class TestHelper
       end
     end
   end
+
+  class TestLogger
+    attr_reader :last_args
+
+    def logger
+      @logger ||= Logger.new(STDOUT)
+    end
+
+    def method_missing(*args)
+      @last_args = args
+      logger.send(*args)
+    end
+  end
 end
 
 TestHelper.configure_redis

@@ -8,14 +8,18 @@ module CounterHelper
     include Redis::RedisHelper
 
     COUNTER_LIST_KEY = "counter_helper:counter_list"
+    AVERAGE_LIST_KEY = "counter_helper:average_list"
     COUNTER_LIST_LOCK_KEY = "counter_helper:counter_list_lock"
+    AVERAGE_LIST_LOCK_KEY = "counter_helper:average_list_lock"
     COUNTER_SLICE_PREFIX = "counter_helper:counters"
+    MAX_KEY_LENGTH = 255
 
     # =================================================================
     # counter operations
     # =================================================================
 
     def increment(key, by=1, &block)
+      key = normalize_key(key)
       register(key) unless registered?(key)
       slice = slice_counter(key)
       value = slice.increment(by)
@@ -24,6 +28,7 @@ module CounterHelper
     end
 
     def decrement(key, by=1, &block)
+      key = normalize_key(key)
       register(key) unless registered?(key)
       slice = slice_counter(key)
       value = slice.decrement(by)
@@ -44,10 +49,12 @@ module CounterHelper
     end
 
     def value(key)
+      key = normalize_key(key)
       slice_counter(key).value
     end
 
     def has_counter?(key)
+      key = normalize_key(key)
       registered?(key)
     end
 
@@ -70,6 +77,30 @@ module CounterHelper
 
     def read_counter!(key, &block)
       read_counter(key, true, &block)
+    end
+
+    def prune_counters
+      keep_count  = 0
+      prune_count = 0
+      end_slice   = slice_index - 1
+
+      each_counter do |key, last_read_slice|
+        has_data = false
+        each_counter_value(key, 0, end_slice, false) do |data|
+          (has_data = true; break) if data[:value] > 0
+        end
+
+        if has_data
+          keep_count += 1
+        else
+          puts "Counter '#{key}' does NOT have data; unregistering"
+
+          prune_count += 1
+          unregister(key)
+        end
+      end
+
+      puts "Done! Examined #{keep_count + prune_count} counters, #{keep_count} have data, #{prune_count} do not and have been unregistered."
     end
 
     def configure(options={})
@@ -250,6 +281,20 @@ module CounterHelper
     # misc
     # =================================================================
 
+    # normalize the given key. the only normalization that we
+    # do at this point is to make sure the key isn't too long...
+    def normalize_key(key)
+      return key unless key && key.length > MAX_KEY_LENGTH
+
+      original_key = key.dup
+      key = key[0...MAX_KEY_LENGTH]
+
+      # increment a counter indicating the problem...
+      increment_with_logging("counter_helper:key_normalization", "Counter key required normaliation", _original_key: original_key, _normalized_key: key)
+
+      key
+    end
+
     # performs a "rewind" operation after an increment or decrement
     # operation (returning the counter to it's previous value) after the
     # execution of the given block. see the increment and decrement
@@ -271,7 +316,7 @@ module CounterHelper
     end
 
     def key_with_prefix(key)
-      [Config.redis_prefix, key].join(":")
+      [Config.redis_prefix, key].compact.join(":")
     end
   end
 end
