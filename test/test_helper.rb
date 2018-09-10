@@ -40,7 +40,7 @@ class TestHelper
 
     def method_missing(*args)
       @last_args = args
-      logger.send(*args)
+      logger.send(*(args[0..1]))
     end
   end
 end
