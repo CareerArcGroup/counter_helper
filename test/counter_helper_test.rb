@@ -5,7 +5,10 @@ class CounterHelperTest < Minitest::Test
     CounterHelper.configure(
       granularity: 60,     # 1 minute
       expiration: 5 * 60,  # 5 minutes
-      logger: logger
+      logger: logger,
+      log_formatter: ->(k, v, msg, opts) do
+        ["[#{k} -> #{v}] #{msg}", opts.merge(counter_key: k)]
+      end
     )
 
     # make sure all counters are marked as read...
@@ -51,22 +54,22 @@ class CounterHelperTest < Minitest::Test
     assert_equal 0, CounterHelper.value(coconut_key)
 
     assert_equal 1, CounterHelper.increment_with_logging(coconut_key, "I just ate a coconut!")
-    assert_logged(:info, "I just ate a coconut!")
+    assert_logged(:info, "[#{coconut_key} -> 1] I just ate a coconut!", counter_key: coconut_key)
 
     assert_equal 2, CounterHelper.increment_with_logging(coconut_key, Exception.new("A coconut hit me on the head!"))
-    assert_logged(:error, "A coconut hit me on the head!")
+    assert_logged(:error, "[#{coconut_key} -> 2] A coconut hit me on the head!", counter_key: coconut_key)
   end
 
-  def test_increment_with_logging
+  def test_decrement_with_logging
     durian_key = TestHelper.create_key("durian")
 
     assert_equal 0, CounterHelper.value(durian_key)
 
     assert_equal -1, CounterHelper.decrement_with_logging(durian_key, "What is that smell?")
-    assert_logged(:info, "What is that smell?")
+    assert_logged(:info, "[#{durian_key} -> -1] What is that smell?", counter_key: durian_key)
 
     assert_equal -2, CounterHelper.decrement_with_logging(durian_key, Exception.new("Someone is eating a durian!"))
-    assert_logged(:error, "Someone is eating a durian!")
+    assert_logged(:error, "[#{durian_key} -> -2] Someone is eating a durian!", counter_key: durian_key)
   end
 
   def test_read_counters
@@ -107,7 +110,7 @@ class CounterHelperTest < Minitest::Test
     @logger ||= TestHelper::TestLogger.new
   end
 
-  def assert_logged(level, payload)
-    assert_equal [level, payload], logger.last_args
+  def assert_logged(*args)
+    assert_equal args, logger.last_args
   end
 end
