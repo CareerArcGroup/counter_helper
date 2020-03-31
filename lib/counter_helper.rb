@@ -79,6 +79,18 @@ module CounterHelper
       read_counter(key, true, &block)
     end
 
+    def mark_read!
+      key = counter_list.key
+      members = counter_list.members
+      current_slice = slice_index - 1
+
+      redis.pipelined do
+        members.each do |member|
+          redis.zadd(key, current_slice, member)
+        end
+      end
+    end
+
     def prune_counters
       keep_count  = 0
       prune_count = 0
