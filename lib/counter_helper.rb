@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'redis_helper'
 
 require 'counter_helper/version'
@@ -115,8 +117,8 @@ module CounterHelper
       puts "Done! Examined #{keep_count + prune_count} counters, #{keep_count} have data, #{prune_count} do not and have been unregistered."
     end
 
-    def configure(options={})
-      Config.from_options(options)
+    def configure(options = {})
+      Config.configure(options)
     end
 
     protected

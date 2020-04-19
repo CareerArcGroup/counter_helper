@@ -1,53 +1,78 @@
+# frozen_string_literal: true
+
+require 'logger'
+
 module CounterHelper
   class Config
+    attr_accessor :options
+
+    DEFAULT_GRANULARITY = 60 # 1 minute
+    DEFAULT_EXPIRATION = 60 * 60 * 2 # 2 hours
+
     class << self
-      require 'logger'
-      attr_accessor :redis_prefix, :log_formatter
+      def configure(options = {})
+        @instance = new(options)
+      end
 
-      DEFAULT_GRANULARITY = 60 # 1 minute
-      DEFAULT_EXPIRATION = 60 * 60 * 2 # 2 hours
-
-      def from_options(options={})
-        options.each do |key, value|
-          send(:"#{key}=", value) if respond_to?(:"#{key}=")
-        end
+      def instance
+        @instance ||= new
       end
 
       def redis
-        @redis || Redis.current
+        instance.redis
       end
 
-      def redis=(value)
-        @redis = value.is_a?(Hash) ? Redis.new(value) : value
+      def redis_prefix
+        instance.redis_prefix
       end
 
       def granularity
-        @granularity || DEFAULT_GRANULARITY
-      end
-
-      def granularity=(value)
-        raise ArgumentError, "granularity cannot be larger than expiration" if value > expiration
-
-        @granularity = value
+        instance.granularity
       end
 
       def expiration
-        @expiration || DEFAULT_EXPIRATION
+        instance.expiration
       end
 
-      def expiration=(value)
-        raise ArgumentError, "expiration cannot be less than or equal to granularity" if value <= granularity
-
-        @expiration = value
+      def log_formatter
+        instance.log_formatter
       end
 
       def logger
-        @logger ||= Logger.new(STDOUT)
+        instance.logger
       end
+    end
 
-      def logger=(l)
-        @logger = l
-      end
+    def initialize(options = {})
+      @options = options
+      @redis   = options[:redis].is_a?(Hash) ? Redis.new(options[:redis]) : options[:redis]
+
+      raise ArgumentError, 'granularity cannot be larger than expiration' if granularity > expiration
+      raise ArgumentError, 'expiration cannot be less than or equal to granularity' if expiration <= granularity
+    end
+
+    def redis
+      @redis || options[:redis]
+    end
+
+    def redis_prefix
+      options[:redis_prefix]
+    end
+
+    def granularity
+      options.fetch(:granularity, DEFAULT_GRANULARITY)
+    end
+
+    def expiration
+      options.fetch(:expiration, DEFAULT_EXPIRATION)
+    end
+
+    def log_formatter
+      options[:log_formatter]
+    end
+
+    def logger
+      @logger ||= options.fetch(:logger, Logger.new(STDOUT))
     end
   end
 end
