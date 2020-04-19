@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'redis_helper'
 
 require 'counter_helper/version'
@@ -79,6 +81,18 @@ module CounterHelper
       read_counter(key, true, &block)
     end
 
+    def mark_read!
+      key = counter_list.key
+      members = counter_list.members
+      current_slice = slice_index - 1
+
+      redis.pipelined do
+        members.each do |member|
+          redis.zadd(key, current_slice, member)
+        end
+      end
+    end
+
     def prune_counters
       keep_count  = 0
       prune_count = 0
@@ -103,8 +117,8 @@ module CounterHelper
       puts "Done! Examined #{keep_count + prune_count} counters, #{keep_count} have data, #{prune_count} do not and have been unregistered."
     end
 
-    def configure(options={})
-      Config.from_options(options)
+    def configure(options = {})
+      Config.configure(options)
     end
 
     protected

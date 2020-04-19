@@ -40,10 +40,10 @@ class CounterHelperTest < Minitest::Test
   def test_decrement
     banana_key = TestHelper.create_key("bananas")
 
-    assert_equal  0, CounterHelper.value(banana_key)
-    assert_equal -1, CounterHelper.decrement(banana_key)
-    assert_equal -1, CounterHelper.value(banana_key)
-    assert_equal -7, CounterHelper.decrement(banana_key, 6)
+    assert_equal(0, CounterHelper.value(banana_key))
+    assert_equal(-1, CounterHelper.decrement(banana_key))
+    assert_equal(-1, CounterHelper.value(banana_key))
+    assert_equal(-7, CounterHelper.decrement(banana_key, 6))
 
     CounterHelper.send(:unregister, banana_key)
   end
@@ -65,10 +65,10 @@ class CounterHelperTest < Minitest::Test
 
     assert_equal 0, CounterHelper.value(durian_key)
 
-    assert_equal -1, CounterHelper.decrement_with_logging(durian_key, "What is that smell?")
+    assert_equal(-1, CounterHelper.decrement_with_logging(durian_key, "What is that smell?"))
     assert_logged(:info, "[#{durian_key} -> -1] What is that smell?", counter_key: durian_key)
 
-    assert_equal -2, CounterHelper.decrement_with_logging(durian_key, Exception.new("Someone is eating a durian!"))
+    assert_equal(-2, CounterHelper.decrement_with_logging(durian_key, Exception.new("Someone is eating a durian!")))
     assert_logged(:error, "[#{durian_key} -> -2] Someone is eating a durian!", counter_key: durian_key)
   end
 
