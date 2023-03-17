@@ -45,14 +45,18 @@ module CounterHelper
 
     def initialize(options = {})
       @options = options
-      @redis   = options[:redis].is_a?(Hash) ? Redis.new(options[:redis]) : options[:redis]
+      
+      if options.key?(:redis)
+        redis = options[:redis].is_a?(Hash) ? Redis.new(options[:redis]) : options[:redis]
+        Redis::RedisHelper.redis = redis
+      end
 
       raise ArgumentError, 'granularity cannot be larger than expiration' if granularity > expiration
       raise ArgumentError, 'expiration cannot be less than or equal to granularity' if expiration <= granularity
     end
 
     def redis
-      @redis || options[:redis]
+      @redis ||= Redis::RedisHelper.redis
     end
 
     def redis_prefix

@@ -1,7 +1,6 @@
 source 'https://rubygems.org'
+git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
-# need to add this here because it's not on rubygems.org...
-gem "redis_helper", git: "git://github.com/CareerArcGroup/redis_helper.git", :tag => '2.0.2'
+gem 'redis_helper', github: 'CareerArcGroup/redis_helper', tag: '3.0.0'
 
-# Specify your gem's dependencies in counter_helper.gemspec
 gemspec
