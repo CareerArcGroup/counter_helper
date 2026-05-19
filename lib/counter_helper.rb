@@ -86,9 +86,9 @@ module CounterHelper
       members = counter_list.members
       current_slice = slice_index - 1
 
-      redis.pipelined do
+      redis.pipelined do |pipeline|
         members.each do |member|
-          redis.zadd(key, current_slice, member)
+          pipeline.zadd(key, current_slice, member)
         end
       end
     end

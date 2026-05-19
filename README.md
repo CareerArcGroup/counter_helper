@@ -68,12 +68,13 @@ Here's a full listing of all of the things you can configure:
 | --------------- | -------------------- | -------------------------------------------------------- |
 | `granularity`   | 60 (1 minute)        | Time-slice duration in seconds.                          |
 | `expiration`    | 7200 (2 hours)       | Time in seconds to keep counter data                     |
-| `redis`         | `Redis.current`      | Redis connection to use. See below for example           |
+| `redis`         | `Redis.new`          | Redis connection to use. See below for example           |
 | `redis_prefix`  | `nil`                | A string prefix to use with all CounterHelper Redis keys |
+| `timeout`       | `nil` (Redis default of 1 second) | Connection timeout in seconds. Only applies when `redis` is a Hash. Set to `5` to restore the pre-5.x Redis default. |
 | `logger`        | `Logger.new(STDOUT)` | The logger CounterHelper should use for logging          |
 | `log_formatter` | `nil`                | See [Logging](#logging)                                  |
 
-By default, CounterHelper will try to use `Redis.current` as a Redis client. If you're already using Redis and have configured it elsewhere, this default may be fine for you. If not, or if you want to put CounterHelper data into its own special place, here are a couple options for how you can configure it:
+By default, CounterHelper requires an explicit Redis connection to be configured. You can configure it using the `redis` option, or by setting `Redis::RedisHelper.redis = Redis.new(...)` directly before using CounterHelper.
 
 ```ruby
 # Option 1: By passing a configuration Hash.
@@ -86,8 +87,18 @@ CounterHelper.configure(
   }
 )
 
+# Option 1b: With a custom timeout (the Redis 5.x default is 1 second)
+CounterHelper.configure(
+  redis: {
+    host: "10.0.0.123",
+    port: 6380,
+    db:   10
+  },
+  timeout: 5
+)
+
 # Option 2: By passing a Redis object
-ConfigHelper.configure(
+CounterHelper.configure(
   redis: Redis.new(host: "10.0.0.123", port: 6380, db: 10)
 )
 ```

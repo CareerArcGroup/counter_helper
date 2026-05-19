@@ -38,6 +38,10 @@ module CounterHelper
         instance.log_formatter
       end
 
+      def timeout
+        instance.timeout
+      end
+
       def logger
         instance.logger
       end
@@ -45,9 +49,15 @@ module CounterHelper
 
     def initialize(options = {})
       @options = options
-      
+
       if options.key?(:redis)
-        redis = options[:redis].is_a?(Hash) ? Redis.new(options[:redis]) : options[:redis]
+        redis_options = options[:redis]
+        redis = if redis_options.is_a?(Hash)
+          redis_options = redis_options.merge(timeout: options[:timeout]) if options.key?(:timeout)
+          Redis.new(redis_options)
+        else
+          redis_options
+        end
         Redis::RedisHelper.redis = redis
       end
 
@@ -73,6 +83,10 @@ module CounterHelper
 
     def log_formatter
       options[:log_formatter]
+    end
+
+    def timeout
+      options[:timeout]
     end
 
     def logger
