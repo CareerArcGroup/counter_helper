@@ -45,9 +45,10 @@ module CounterHelper
 
     def initialize(options = {})
       @options = options
-      
+
       if options.key?(:redis)
         redis = options[:redis].is_a?(Hash) ? Redis.new(options[:redis]) : options[:redis]
+
         Redis::RedisHelper.redis = redis
       end
 
