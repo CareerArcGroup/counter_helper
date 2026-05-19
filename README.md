@@ -68,9 +68,8 @@ Here's a full listing of all of the things you can configure:
 | --------------- | -------------------- | -------------------------------------------------------- |
 | `granularity`   | 60 (1 minute)        | Time-slice duration in seconds.                          |
 | `expiration`    | 7200 (2 hours)       | Time in seconds to keep counter data                     |
-| `redis`         | `Redis.new`          | Redis connection to use. See below for example           |
+| `redis`         | `nil`                | Redis connection to use. See below for example           |
 | `redis_prefix`  | `nil`                | A string prefix to use with all CounterHelper Redis keys |
-| `timeout`       | `nil` (Redis default of 1 second) | Connection timeout in seconds. Only applies when `redis` is a Hash. Set to `5` to restore the pre-5.x Redis default. |
 | `logger`        | `Logger.new(STDOUT)` | The logger CounterHelper should use for logging          |
 | `log_formatter` | `nil`                | See [Logging](#logging)                                  |
 
@@ -83,18 +82,9 @@ CounterHelper.configure(
   redis: {
     host: "10.0.0.123",
     port: 6380,
-    db:   10
+    db:   10,
+    timeout: 5
   }
-)
-
-# Option 1b: With a custom timeout (the Redis 5.x default is 1 second)
-CounterHelper.configure(
-  redis: {
-    host: "10.0.0.123",
-    port: 6380,
-    db:   10
-  },
-  timeout: 5
 )
 
 # Option 2: By passing a Redis object
