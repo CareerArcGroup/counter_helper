@@ -13,6 +13,7 @@ class TestHelper
         Redis::RedisHelper.redis = Redis.new(YAML.load(File.read(config_path)))
       else
         puts "No redis.yml file found in root directory, using default connection settings..."
+        Redis::RedisHelper.redis = Redis.new
       end
     end
 

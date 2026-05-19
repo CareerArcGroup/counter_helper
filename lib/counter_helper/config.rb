@@ -8,6 +8,7 @@ module CounterHelper
 
     DEFAULT_GRANULARITY = 60 # 1 minute
     DEFAULT_EXPIRATION = 60 * 60 * 2 # 2 hours
+    DEFAULT_TIMEOUT = 1 # 1 second
 
     class << self
       def configure(options = {})
@@ -51,13 +52,9 @@ module CounterHelper
       @options = options
 
       if options.key?(:redis)
-        redis_options = options[:redis]
-        redis = if redis_options.is_a?(Hash)
-          redis_options = redis_options.merge(timeout: options[:timeout]) if options.key?(:timeout)
-          Redis.new(redis_options)
-        else
-          redis_options
-        end
+        redis = options[:redis]
+        redis = Redis.new(redis.merge(timeout: timeout)) if redis.is_a?(Hash)
+
         Redis::RedisHelper.redis = redis
       end
 
@@ -86,7 +83,7 @@ module CounterHelper
     end
 
     def timeout
-      options[:timeout]
+      options.fetch(:timeout, DEFAULT_TIMEOUT)
     end
 
     def logger
