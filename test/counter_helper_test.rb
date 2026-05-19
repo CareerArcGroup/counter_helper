@@ -2,8 +2,6 @@ require "test_helper"
 
 class CounterHelperTest < Minitest::Test
   def setup
-    Redis::RedisHelper.redis = Redis.new
-
     CounterHelper.configure(
       granularity: 60,     # 1 minute
       expiration: 5 * 60,  # 5 minutes
